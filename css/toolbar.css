@@ -1,0 +1,33 @@
+/* ===== TOOLBAR ===== */
+#toolbar{height:48px;background:#16213e;border-bottom:1px solid #0f3460;display:flex;align-items:center;padding:0 12px;gap:8px;flex-shrink:0;z-index:100}
+#toolbar .logo{font-size:16px;font-weight:bold;color:#e94560;margin-right:8px;white-space:nowrap}
+#toolbar .sep{width:1px;height:28px;background:#0f3460;margin:0 4px}
+.tb-btn{background:#0f3460;color:#c0c8e0;border:1px solid #1a4a80;border-radius:4px;padding:5px 10px;transition:all .15s}
+.tb-btn:hover{background:#1a4a80;color:#fff}
+.tb-btn.active{background:#e94560;border-color:#e94560;color:#fff}
+.tb-btn-group{display:flex;gap:2px}
+.tb-btn-group .tb-btn{border-radius:0}
+.tb-btn-group .tb-btn:first-child{border-radius:4px 0 0 4px}
+.tb-btn-group .tb-btn:last-child{border-radius:0 4px 4px 0}
+.tb-btn.danger{background:#3a1a1a;border-color:#a03030;color:#ff6666}
+.tb-btn.danger:hover{background:#a03030;color:#fff}
+.tb-btn.export{background:#1a3a1a;border-color:#2a7a2a;color:#88ff88}
+.tb-btn.export:hover{background:#2a7a2a;color:#fff}
+.tb-btn:disabled{opacity:0.35;cursor:not-allowed}
+.tb-btn:disabled:hover{background:#0f3460;color:#c0c8e0}
+#toolbar .spacer{flex:1}
+
+/* ===== MODE SWITCHER ===== */
+.mode-switcher{display:flex;background:#060e1c;border-radius:6px;padding:2px;gap:2px;border:1px solid #0f3060;margin:0 6px}
+.mode-btn{padding:4px 14px;border-radius:4px;font-size:12px;font-weight:bold;transition:all .2s;color:#4a6080;background:transparent;border:none;cursor:pointer;white-space:nowrap}
+.mode-btn:hover{color:#c0c8e0}
+.mode-btn.active{background:#0f3460;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+#mode-btn-design.active{background:linear-gradient(135deg,#1a3a6a,#0f3060);color:#7ab8ff}
+#mode-btn-content.active{background:linear-gradient(135deg,#1a3a2a,#0f3a20);color:#7affa0}
+.mode-lock-note{background:#1a1a2a;border:1px solid #3a2060;border-radius:4px;padding:6px 10px;font-size:11px;color:#7a5a90;margin-bottom:8px;text-align:center}
+.mode-badge{font-size:10px;opacity:0.6;margin-left:2px}
+
+/* Slice mode bar */
+#slice-mode-bar{background:#1a1000;border-bottom:1px solid #3a2000;padding:6px 12px;display:flex;align-items:center;gap:8px;font-size:12px;color:#ffaa44;flex-shrink:0}
+#slice-mode-bar.hidden{display:none}
+.slice-info{flex:1}

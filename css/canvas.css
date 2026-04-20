@@ -1,0 +1,11 @@
+/* ===== CENTER CANVAS ===== */
+#canvas-area{flex:1;overflow:auto;background:#0a0a18;background-image:radial-gradient(circle,#1a2a40 1px,transparent 1px);background-size:20px 20px;display:flex;justify-content:center;align-items:flex-start;padding:30px 20px}
+#canvas-inner{position:relative;transform-origin:top center;flex-shrink:0}
+#canvas-inner{box-shadow:0 8px 40px rgba(0,0,0,.8),0 0 0 1px rgba(255,255,255,.05)}
+#canvas-inner::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:0}
+#main-canvas{display:block;cursor:default}
+#overlay-canvas{position:absolute;top:0;left:0;pointer-events:none;cursor:default}
+#overlay-canvas.interactive{pointer-events:auto}
+#slice-overlay{position:absolute;top:0;left:0;width:100%;pointer-events:none}
+.slice-line{position:absolute;left:0;right:0;height:2px;background:rgba(255,80,80,.8);cursor:ns-resize;pointer-events:auto}
+.slice-line::before{content:attr(data-y);position:absolute;right:4px;top:-16px;background:rgba(255,80,80,.8);color:#fff;font-size:10px;padding:1px 4px;border-radius:2px}

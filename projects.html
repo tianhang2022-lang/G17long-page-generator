@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>长图生成器 - 项目管理</title>
+<link rel="stylesheet" href="css/base.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#060a18;color:#c0c8e0;font-family:'Microsoft YaHei',sans-serif;min-height:100vh}
+.pm-header{background:#0a1020;border-bottom:1px solid #0f3060;padding:14px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.pm-logo{font-size:16px;font-weight:bold;color:#4a8af0;text-decoration:none;display:flex;align-items:center;gap:8px}
+.pm-actions{display:flex;gap:8px;align-items:center}
+.btn-primary{padding:7px 18px;background:#0f3460;color:#4a8af0;border:1px solid #4a8af0;border-radius:6px;font-size:12px;cursor:pointer;transition:all .2s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
+.btn-primary:hover{background:#1a4a80;color:#fff;border-color:#6ab0ff}
+.pm-body{padding:32px;max-width:1200px;margin:0 auto}
+.pm-section-title{font-size:11px;color:#4a6080;margin-bottom:16px;font-weight:bold;text-transform:uppercase;letter-spacing:.8px;display:flex;align-items:center;gap:6px}
+.pm-section-title::after{content:'';flex:1;height:1px;background:#0f3060}
+.project-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;margin-bottom:32px}
+.project-card{background:#0a1020;border:1px solid #0f3060;border-radius:8px;overflow:hidden;cursor:pointer;transition:all .2s;position:relative}
+.project-card:hover{border-color:#4a8af0;transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.project-card .thumbnail{width:100%;height:120px;background:#060e1c;object-fit:cover;display:block}
+.project-card .thumb-placeholder{width:100%;height:120px;background:linear-gradient(135deg,#0a1830,#060e1c);display:flex;align-items:center;justify-content:center;font-size:40px;color:#0f3060}
+.project-card .card-info{padding:10px 12px}
+.project-card .card-name{font-size:12px;color:#c0c8e0;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.project-card .card-date{font-size:10px;color:#2a4060;margin-top:3px}
+.project-card .card-actions{position:absolute;top:6px;right:6px;display:none;gap:3px}
+.project-card:hover .card-actions{display:flex}
+.card-btn{width:24px;height:24px;background:rgba(6,10,24,.85);color:#c0c8e0;border:1px solid #1a3060;border-radius:4px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.card-btn:hover{background:#0f3060;color:#4a8af0}
+.new-project-card{border:2px dashed #0f3060;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:172px;color:#2a4060;font-size:12px;gap:6px;transition:all .2s}
+.new-project-card:hover{border-color:#4a8af0;color:#4a8af0;background:#040a14}
+.new-project-card .plus{font-size:36px;line-height:1;font-weight:300}
+.search-bar{display:flex;gap:8px;margin-bottom:20px}
+.search-input{flex:1;padding:7px 12px;background:#0a1020;color:#c0c8e0;border:1px solid #0f3060;border-radius:6px;font-size:12px;outline:none}
+.search-input:focus{border-color:#4a8af0}
+.empty-hint{text-align:center;padding:60px 0;color:#2a4060;font-size:13px}
+</style>
+</head>
+<body>
+<div class="pm-header">
+  <a href="projects.html" class="pm-logo">🎮 长图生成器</a>
+  <div class="pm-actions">
+    <button class="btn-primary" onclick="importProjectFile()">📂 导入项目</button>
+    <input type="file" id="import-project-input" accept=".json" style="display:none" onchange="handleImportProject(this)">
+  </div>
+</div>
+<div class="pm-body">
+  <div class="search-bar">
+    <input class="search-input" type="text" id="search-input" placeholder="搜索项目..." oninput="filterProjects(this.value)">
+  </div>
+  <div class="pm-section-title">我的项目</div>
+  <div class="project-grid" id="project-grid">
+    <div class="project-card new-project-card" onclick="createNewProject()">
+      <div class="plus">＋</div><div>新建项目</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DB_NAME = 'LongPageDB';
+let db = null;
+let allProjects = [];
+
+async function initDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 2);
+    req.onupgradeneeded = e => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('projects')) d.createObjectStore('projects', { keyPath: 'id' });
+      if (!d.objectStoreNames.contains('assets')) d.createObjectStore('assets', { keyPath: 'id' });
+    };
+    req.onsuccess = e => { db = e.target.result; resolve(db); };
+    req.onerror = reject;
+  });
+}
+
+async function listProjects() {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('projects', 'readonly');
+    const req = tx.objectStore('projects').getAll();
+    req.onsuccess = e => resolve(e.target.result || []);
+    req.onerror = reject;
+  });
+}
+
+function formatDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleDateString('zh-CN') + ' ' + d.toLocaleTimeString('zh-CN', {hour:'2-digit',minute:'2-digit'});
+}
+
+function renderGrid(projects) {
+  const grid = document.getElementById('project-grid');
+  projects = [...projects].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  let html = `<div class="project-card new-project-card" onclick="createNewProject()">
+    <div class="plus">＋</div><div>新建项目</div></div>`;
+  if (!projects.length) {
+    html += `<div class="empty-hint" style="grid-column:1/-1">暂无项目，点击「新建项目」开始创作</div>`;
+  }
+  for (const p of projects) {
+    const thumb = p.thumbnail
+      ? `<img class="thumbnail" src="${p.thumbnail}" alt="">`
+      : `<div class="thumb-placeholder">🖼</div>`;
+    html += `<div class="project-card" ondblclick="openProject('${p.id}')">
+      ${thumb}
+      <div class="card-actions">
+        <button class="card-btn" onclick="openProject('${p.id}');event.stopPropagation()" title="打开编辑">✏️</button>
+        <button class="card-btn" onclick="exportProject('${p.id}');event.stopPropagation()" title="导出文件">💾</button>
+        <button class="card-btn" onclick="duplicateProject('${p.id}');event.stopPropagation()" title="复制项目">⧉</button>
+        <button class="card-btn" onclick="confirmDelete('${p.id}');event.stopPropagation()" title="删除" style="color:#ff6666">🗑</button>
+      </div>
+      <div class="card-info">
+        <div class="card-name" title="${escHtml(p.name||'未命名')}">${escHtml(p.name||'未命名项目')}</div>
+        <div class="card-date">${formatDate(p.updatedAt)}</div>
+      </div>
+    </div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function filterProjects(query) {
+  const q = query.toLowerCase().trim();
+  const filtered = q ? allProjects.filter(p => (p.name||'').toLowerCase().includes(q)) : allProjects;
+  renderGrid(filtered);
+}
+
+async function loadAndRender() {
+  allProjects = await listProjects();
+  renderGrid(allProjects);
+}
+
+function createNewProject() {
+  const name = prompt('项目名称：', '新建项目') || '新建项目';
+  const id = 'proj_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  const tx = db.transaction('projects', 'readwrite');
+  tx.objectStore('projects').put({
+    id, name, updatedAt: Date.now(),
+    modules: [], canvas: { width: 750 },
+    pageBg: { type: 'color', color: '#0a0a18' }
+  });
+  tx.oncomplete = () => { window.location.href = `index.html?project=${id}`; };
+}
+
+function openProject(id) {
+  window.location.href = `index.html?project=${id}`;
+}
+
+async function confirmDelete(id) {
+  const p = allProjects.find(p => p.id === id);
+  if (!confirm(`确定删除「${p?.name||'项目'}」？此操作不可撤销。`)) return;
+  const tx = db.transaction('projects', 'readwrite');
+  tx.objectStore('projects').delete(id);
+  tx.oncomplete = () => loadAndRender();
+}
+
+async function duplicateProject(id) {
+  const tx = db.transaction('projects', 'readonly');
+  const req = tx.objectStore('projects').get(id);
+  req.onsuccess = e => {
+    const p = { ...e.target.result };
+    p.id = 'proj_' + Date.now() + '_copy';
+    p.name = (p.name || '项目') + ' - 副本';
+    p.updatedAt = Date.now();
+    delete p.thumbnail;
+    const tx2 = db.transaction('projects', 'readwrite');
+    tx2.objectStore('projects').put(p);
+    tx2.oncomplete = () => loadAndRender();
+  };
+}
+
+async function exportProject(id) {
+  const tx = db.transaction('projects', 'readonly');
+  const req = tx.objectStore('projects').get(id);
+  req.onsuccess = e => {
+    const p = e.target.result;
+    if (!p) return;
+    const { thumbnail, ...data } = p; // exclude thumbnail from export
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = (p.name || 'project') + '.json'; a.click();
+    URL.revokeObjectURL(url);
+  };
+}
+
+function importProjectFile() {
+  document.getElementById('import-project-input').value = '';
+  document.getElementById('import-project-input').click();
+}
+
+async function handleImportProject(input) {
+  const file = input.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if (!data.modules) throw new Error('格式无效，缺少 modules 字段');
+    data.id = data.id || ('proj_' + Date.now());
+    data.name = data.name || file.name.replace(/\.json$/i,'');
+    data.updatedAt = Date.now();
+    const tx = db.transaction('projects', 'readwrite');
+    tx.objectStore('projects').put(data);
+    tx.oncomplete = () => { alert('✅ 导入成功'); loadAndRender(); };
+  } catch(e) {
+    alert('导入失败：' + e.message);
+  }
+}
+
+initDB().then(() => loadAndRender());
+</script>
+</body>
+</html>

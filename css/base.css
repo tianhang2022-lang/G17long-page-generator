@@ -1,0 +1,10 @@
+/* ===== RESET & BASE ===== */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Microsoft YaHei',sans-serif;font-size:13px;background:#1a1a2e;color:#e0e0e0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+button{cursor:pointer;border:none;outline:none;font-family:inherit;font-size:12px}
+input,select,textarea{font-family:inherit;font-size:12px;outline:none}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#1a1a2e}
+::-webkit-scrollbar-thumb{background:#444;border-radius:3px}
+
+.hidden{display:none!important}
