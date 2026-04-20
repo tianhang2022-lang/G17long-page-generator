@@ -221,6 +221,12 @@ input,select,textarea{font-family:inherit;font-size:12px;outline:none}
 #page-module-list .mod-card .mod-label{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #page-module-list .mod-card .mod-del{font-size:10px;color:#333;padding:0 2px;flex-shrink:0;background:none;border:none;cursor:pointer}
 #page-module-list .mod-card .mod-del:hover{color:#ff4444}
+.mod-move-btns{display:flex;flex-direction:column;gap:1px;margin-right:2px}
+.mod-mv-btn{background:none;color:#2a4060;font-size:9px;padding:1px 2px;line-height:1;border:none;cursor:pointer;border-radius:2px;transition:color .15s}
+.mod-mv-btn:hover{color:#4a8af0}
+.mod-mv-btn:disabled{opacity:0.2;cursor:not-allowed}
+#page-module-list .mod-card[draggable="true"]{cursor:grab}
+#page-module-list .mod-card[draggable="true"]:active{cursor:grabbing;opacity:0.7}
 .add-mod-btn{width:100%;padding:6px;background:transparent;color:#2a4a70;border:1px dashed #0f3060;border-radius:4px;font-size:11px;cursor:pointer;transition:all .15s;margin-top:4px}
 .add-mod-btn:hover{color:#4a8af0;border-color:#4a8af0}
 
@@ -349,7 +355,11 @@ input,select,textarea{font-family:inherit;font-size:12px;outline:none}
             <label class="radio-opt"><input type="radio" name="page-bg" value="image" onchange="setPageBg('image')"> 图片</label>
           </div>
           <div id="page-bg-color-ctrl">
-            <input type="color" class="full-color" value="#0a0a18" oninput="updatePageBgColor(this.value)">
+            <input type="color" class="full-color" value="#0a0a18" oninput="updatePageBgColor(this.value)" title="背景颜色">
+            <div id="page-bg-gradient-extra" class="hidden" style="margin-top:4px">
+              <label style="font-size:10px;color:#4a6080">渐变终止色</label>
+              <input type="color" class="full-color" value="#000000" oninput="updatePageBgColor2(this.value)" title="渐变终止颜色">
+            </div>
           </div>
           <div id="page-bg-image-ctrl" class="hidden">
             <button class="upload-btn" onclick="uploadPageBgImage()">📁 上传背景图</button>
@@ -542,6 +552,7 @@ const appState = {
   mode: 'design', // 'design' | 'content' — kept for compatibility
   zoom: 1.0,
   canvas: {width:750, bgColor:'#1a1a2e'},
+  pageBg: { type: 'color', color: '#0a0a18' },
   assets: {backgrounds:[], titleBars:[], textBoxes:[], images:[], others:[]},
   modules: [],
   selectedModuleId: null,
@@ -866,9 +877,28 @@ async function renderAll() {
   const w = appState.canvas.width;
   const h = mainCanvas.height;
 
-  // Base background
-  ctx.fillStyle = appState.canvas.bgColor || '#1a1a2e';
-  ctx.fillRect(0, 0, w, h);
+  // Draw page background
+  const pgBg = appState.pageBg;
+  if (pgBg && pgBg.type === 'image' && pgBg.imageDataUrl) {
+    // Draw full-canvas background image
+    const bgImg = new Image();
+    await new Promise(resolve => {
+      bgImg.onload = resolve;
+      bgImg.onerror = resolve;
+      bgImg.src = pgBg.imageDataUrl;
+    });
+    ctx.drawImage(bgImg, 0, 0, mainCanvas.width, mainCanvas.height);
+  } else if (pgBg && pgBg.type === 'gradient' && pgBg.color) {
+    const grad = ctx.createLinearGradient(0, 0, 0, mainCanvas.height);
+    grad.addColorStop(0, pgBg.color);
+    grad.addColorStop(1, pgBg.color2 || '#000000');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+  } else {
+    // Solid color (default)
+    ctx.fillStyle = (pgBg && pgBg.color) || appState.bgColor || '#0a0a18';
+    ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
+  }
 
   // Draw each module's elements
   for (const mod of appState.modules) {
@@ -2814,9 +2844,18 @@ function renderPageView() {
   const listEl = document.getElementById('page-module-list');
   if (!listEl) return;
   listEl.innerHTML = appState.modules.map(function(mod, i) {
-    return '<div class="mod-card' + (mod.id===appState.selectedModuleId?' active':'') + '" onclick="selectModuleInView(\'' + mod.id + '\')">'
+    return '<div class="mod-card' + (mod.id===appState.selectedModuleId?' active':'') + '"'
+      + ' onclick="selectModuleInView(\'' + mod.id + '\')"'
+      + ' draggable="true"'
+      + ' ondragstart="modDragStart(event,' + i + ')"'
+      + ' ondragover="event.preventDefault()"'
+      + ' ondrop="modDrop(event,' + i + ')">'
       + '<span class="mod-seq">' + (i+1) + '</span>'
       + '<span class="mod-label">' + escHtml(mod.name||'模块') + '</span>'
+      + '<div class="mod-move-btns">'
+      + '<button class="mod-mv-btn" onclick="moveModule(' + i + ',-1);event.stopPropagation()" title="上移"' + (i===0?' disabled':'') + '>↑</button>'
+      + '<button class="mod-mv-btn" onclick="moveModule(' + i + ',1);event.stopPropagation()" title="下移"' + (i===appState.modules.length-1?' disabled':'') + '>↓</button>'
+      + '</div>'
       + '<button class="mod-del" onclick="deleteModule(\'' + mod.id + '\');event.stopPropagation()">✕</button>'
       + '</div>';
   }).join('');
@@ -2832,6 +2871,31 @@ function renderPageView() {
     const el = document.getElementById('pg-m'+d[0]);
     if (el) el.value = m[d]||0;
   });
+}
+
+function moveModule(index, delta) {
+  const mods = appState.modules;
+  const newIndex = index + delta;
+  if (newIndex < 0 || newIndex >= mods.length) return;
+  // Swap
+  [mods[index], mods[newIndex]] = [mods[newIndex], mods[index]];
+  renderAll(); renderPageView(); saveConfig();
+}
+
+let _modDragIdx = null;
+function modDragStart(event, index) {
+  _modDragIdx = index;
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', index);
+}
+function modDrop(event, targetIndex) {
+  event.preventDefault();
+  if (_modDragIdx === null || _modDragIdx === targetIndex) return;
+  const mods = appState.modules;
+  const dragged = mods.splice(_modDragIdx, 1)[0];
+  mods.splice(targetIndex, 0, dragged);
+  _modDragIdx = null;
+  renderAll(); renderPageView(); saveConfig();
 }
 
 function renderBlockView() {
@@ -2933,9 +2997,11 @@ function switchAssetTab(tab, btn) {
 
 // Page background
 function setPageBg(type) {
-  if (!appState.pageBg) appState.pageBg = {type:'color',color:'#0a0a18'};
+  if (!appState.pageBg) appState.pageBg = { type: 'color', color: '#0a0a18' };
   appState.pageBg.type = type;
   togglePageBgCtrl(type);
+  const gradExtra = document.getElementById('page-bg-gradient-extra');
+  if (gradExtra) gradExtra.classList.toggle('hidden', type !== 'gradient');
   renderAll();
 }
 
@@ -2947,9 +3013,15 @@ function togglePageBgCtrl(type) {
 }
 
 function updatePageBgColor(val) {
-  if (!appState.pageBg) appState.pageBg = {type:'color',color:val};
+  if (!appState.pageBg) appState.pageBg = { type: 'color', color: val };
   appState.pageBg.color = val;
-  appState.bgColor = val;
+  appState.bgColor = val; // keep compat
+  renderAll(); saveConfig();
+}
+
+function updatePageBgColor2(val) {
+  if (!appState.pageBg) appState.pageBg = {};
+  appState.pageBg.color2 = val;
   renderAll(); saveConfig();
 }
 
