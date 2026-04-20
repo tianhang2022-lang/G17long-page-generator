@@ -3310,7 +3310,8 @@ async function init() {
       togglePreview();
     }
   });
-  document.getElementById('preview-body').addEventListener('wheel', function(e) {
+  const _pvBody = document.getElementById('preview-body');
+  if (_pvBody) _pvBody.addEventListener('wheel', function(e) {
     if (!e.ctrlKey) return;
     e.preventDefault();
     previewZoom(e.deltaY < 0 ? 0.1 : -0.1);
